@@ -1,0 +1,37 @@
+﻿@model AttestationProject.Models.ApplicationUser
+
+@{
+    ViewData["Title"] = "Редактировать профиль";
+}
+
+<div class="container mt-5">
+    <div class="card p-4 shadow">
+        <h3>Редактировать профиль</h3>
+        <hr />
+
+        <form asp-action="Edit" method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label asp-for="FullName" class="form-label"></label>
+                <input asp-for="FullName" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Phone" class="form-label"></label>
+                <input asp-for="Phone" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Address" class="form-label"></label>
+                <input asp-for="Address" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label>Фото профиля</label>
+                <input type="file" name="imageFile" class="form-control" />
+            </div>
+
+            <button type="submit" class="btn btn-success">Сохранить</button>
+            <a asp-action="Index" class="btn btn-outline-secondary ms-2">Назад</a>
+        </form>
+    </div>
+</div>

@@ -1,0 +1,65 @@
+﻿@model AttestationProject.Models.Product
+
+@{
+    ViewData["Title"] = "Добавить товар";
+}
+
+<h2 class="mb-4">@ViewData["Title"]</h2>
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger">Пожалуйста, заполните все поля корректно.</div>
+}
+
+<form asp-action="Create" method="post" enctype="multipart/form-data" class="mt-4">
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Category" class="form-label"></label>
+        <select asp-for="Category" class="form-control">
+            <option value="">-- Выберите категорию --</option>
+            <option>Электроника</option>
+            <option>Одежда</option>
+            <option>Книги</option>
+        </select>
+        <span asp-validation-for="Category" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Subcategory" class="form-label"></label>
+        <select asp-for="Subcategory" class="form-control">
+            <option value="">-- Выберите подкатегорию --</option>
+            <option>Телефоны</option>
+            <option>Футболки</option>
+            <option>Фантастика</option>
+        </select>
+        <span asp-validation-for="Subcategory" class="text-danger"></span>
+    </div>
+
+
+    <div class="mb-3">
+        <label asp-for="Description" class="form-label"></label>
+        <textarea asp-for="Description" class="form-control"></textarea>
+        <span asp-validation-for="Description" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Price" class="form-label"></label>
+        <input asp-for="Price" class="form-control" />
+        <span asp-validation-for="Price" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Фото</label>
+        <input type="file" name="imageFile" class="form-control" />
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-animate">Сохранить</button>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

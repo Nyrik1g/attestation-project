@@ -1,0 +1,40 @@
+﻿@model List<AttestationProject.Models.Product>
+
+@{
+    ViewData["Title"] = "Мои товары";
+}
+
+<div class="container mt-5">
+    <div class="card p-4 shadow">
+        <h3>Мои опубликованные товары</h3>
+        <hr />
+
+        @if (!Model.Any())
+        {
+            <p>Вы ещё не размещали товары.</p>
+        }
+        else
+        {
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                @foreach (var product in Model)
+                {
+                    <div class="col">
+                        <div class="card h-100 shadow-sm">
+                            @if (!string.IsNullOrEmpty(product.ImagePath))
+                            {
+                                <img src="@product.ImagePath" class="card-img-top" style="height: 200px; object-fit: cover;" />
+                            }
+                            <div class="card-body">
+                                <h5>@product.Name</h5>
+                                <p class="text-muted">@product.Description</p>
+                                <strong>@product.Price.ToString("C")</strong>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <a asp-controller="Profile" asp-action="Index" class="btn btn-outline-secondary mt-3">Назад</a>
+    </div>
+</div>

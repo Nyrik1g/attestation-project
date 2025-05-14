@@ -1,0 +1,95 @@
+﻿@model List<AttestationProject.Models.Product>
+
+@{
+    ViewData["Title"] = "Список товаров";
+}
+
+<h2 class="mb-4">@ViewData["Title"]</h2>
+
+<!-- 🔍 Фильтр по цене -->
+<form method="get" class="row row-cols-lg-auto g-3 align-items-center mb-4">
+    <!-- Каталог + кнопка добавления товара -->
+    <div class="d-flex justify-content-between">
+        <a asp-controller="Product" asp-action="Create" class="btn btn-outline-success">
+            <i class="bi bi-plus-circle"></i> Добавить
+        </a>
+    </div>
+
+    <!-- Категория и подкатегория -->
+    <form method="get" class="row row-cols-lg-auto g-3 align-items-center mb-4">
+        <div class="col">
+            <select name="category" class="form-select">
+                <option value="">Все категории</option>
+                <option value="Электроника">Электроника</option>
+                <option value="Одежда">Одежда</option>
+                <option value="Книги">Книги</option>
+            </select>
+        </div>
+        <div class="col">
+            <select name="subcategory" class="form-select">
+                <option value="">Все подкатегории</option>
+                <option value="Смартфоны">Смартфоны</option>
+                <option value="Ноутбуки">Ноутбуки</option>
+                <option value="Футболки">Футболки</option>
+                <option value="Художка">Художка</option>
+            </select>
+        </div>
+        <div class="col">
+            <input type="number" name="minPrice" step="0.01" class="form-control" placeholder="Мин. цена" value="@(ViewData["minPrice"] ?? "")" />
+        </div>
+        <div class="col">
+            <input type="number" name="maxPrice" step="0.01" class="form-control" placeholder="Макс. цена" value="@(ViewData["maxPrice"] ?? "")" />
+        </div>
+        <div class="col">
+            <button type="submit" class="btn btn-primary btn-animate">
+                <i class="bi bi-funnel-fill"></i> Фильтр
+            </button>
+        </div>
+    </form>
+
+</form>
+
+@if (!Model.Any())
+{
+    <p>Нет добавленных товаров.</p>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        @foreach (var product in Model)
+        {
+            <div class="col">
+                <div class="card product-card h-100 shadow-sm border-0">
+                    @if (!string.IsNullOrEmpty(product.ImagePath))
+                    {
+                        <img src="@product.ImagePath" class="card-img-top" alt="@product.Name" style="height: 200px; object-fit: cover;" />
+                    }
+
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-box-seam"></i> @product.Name
+                        </h5>
+                        <p class="card-text text-muted">@product.Description</p>
+                        <p class="card-text fw-bold">@product.Price.ToString("C")</p>
+
+                        @if (User.Identity.IsAuthenticated && (User.Identity.Name == product.CreatedBy || User.IsInRole("Admin")))
+                        {
+                            <div class="d-flex justify-content-end gap-2 mt-3">
+                                <a asp-action="Edit" asp-route-id="@product.Id" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                                <a asp-action="Delete" asp-route-id="@product.Id" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить товар?');">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                                <p class="card-text text-end small text-muted mt-3">
+                                    Добавил: <strong>@product.CreatedBy</strong>
+                                </p>
+
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

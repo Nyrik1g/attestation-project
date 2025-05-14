@@ -1,0 +1,40 @@
+﻿## Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+
+## Build results
+bin/
+obj/
+publish/
+out/
+
+## ASP.NET Core
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.json
+
+## Logs
+*.log
+
+## Dependency folders
+node_modules/
+packages/
+
+## Rider
+.idea/
+
+## OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+## Others
+*.db
+*.sqlite
+*.bak
+*.tmp

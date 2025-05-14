@@ -1,0 +1,42 @@
+﻿@model List<AttestationProject.Models.Product>
+
+@{
+    ViewData["Title"] = "Главная";
+}
+
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1 class="display-4">Добро пожаловать в AttestationProject</h1>
+        <p class="lead">Товары для вас. Популярное. Актуальное. Удобное.</p>
+        <a asp-controller="Product" asp-action="Index" class="btn btn-primary btn-lg btn-animate mt-4">
+            Перейти в каталог
+        </a>
+    </div>
+
+    @if (Model != null && Model.Any())
+    {
+        <h3 class="mb-4 text-center">Популярные товары</h3>
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            @foreach (var product in Model)
+            {
+                <div class="col">
+                    <div class="card h-100 shadow-sm border-0">
+                        @if (!string.IsNullOrEmpty(product.ImagePath))
+                        {
+                            <img src="@product.ImagePath" class="card-img-top" style="height: 200px; object-fit: cover;" />
+                        }
+                        <div class="card-body">
+                            <h5 class="card-title">@product.Name</h5>
+                            <p class="card-text text-muted">@product.Description</p>
+                            <p class="card-text fw-bold">@product.Price.ToString("C")</p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="text-center text-muted">Популярных товаров пока нет.</p>
+    }
+</div>

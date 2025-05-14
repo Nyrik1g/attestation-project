@@ -1,0 +1,25 @@
+﻿@model AttestationProject.Models.ViewModels.ProfileViewModel
+
+@{
+    ViewData["Title"] = "Профиль";
+}
+
+<div class="container mt-5">
+    <div class="card p-4 shadow">
+        <h3>Мой профиль</h3>
+        <hr />
+
+        @if (!string.IsNullOrEmpty(Model.ExistingImagePath))
+        {
+            <img src="@Model.ExistingImagePath" alt="Фото профиля" class="rounded mb-3" width="120" height="120" />
+        }
+
+        <p><strong>Почта:</strong> @Model.Email</p>
+        <p><strong>ФИО:</strong> @Model.FullName</p>
+        <p><strong>Телефон:</strong> @Model.PhoneNumber</p>
+        <p><strong>Адрес:</strong> @Model.Address</p>
+
+        <a asp-action="Edit" class="btn btn-primary">Редактировать</a>
+        <a asp-controller="Product" asp-action="MyProducts" class="btn btn-outline-secondary ms-2">Мои товары</a>
+    </div>
+</div>
