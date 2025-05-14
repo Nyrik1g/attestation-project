@@ -54,4 +54,23 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+using (var scope = app.Services.CreateScope())
+{
+    var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    string[] roles = { "Admin", "User" };
+
+    foreach (var role in roles)
+        if (!await roleMgr.RoleExistsAsync(role))
+            await roleMgr.CreateAsync(new IdentityRole(role));
+}
+// Program.cs ‒ сразу под сидом ролей
+using (var scope = app.Services.CreateScope())
+{
+    var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    var firstUser = await userMgr.FindByEmailAsync("nyrik4653@gmail.com");
+    if (firstUser != null && !await userMgr.IsInRoleAsync(firstUser, "Admin"))
+        await userMgr.AddToRoleAsync(firstUser, "Admin");
+}
+
+
 app.Run();

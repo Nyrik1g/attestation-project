@@ -1,0 +1,8 @@
+﻿@if (User.IsInRole("Admin"))
+{
+    <li class="nav-item">
+        <a class="nav-link" asp-controller="Admin" asp-action="Index">
+            <i class="bi bi-shield-lock"></i> Админка
+        </a>
+    </li>
+}
