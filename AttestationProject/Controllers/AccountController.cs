@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using AttestationProject.Models;
 using AttestationProject.Models.ViewModels;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -36,7 +35,7 @@ namespace AttestationProject.Controllers
             return View();
         }
 
-        [HttpPost, AllowAnonymous]
+        [HttpPost, AllowAnonymous, ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterViewModel model, string returnUrl = null)
         {
             ViewData["ReturnUrl"] = returnUrl;
@@ -45,7 +44,7 @@ namespace AttestationProject.Controllers
 
             if (await _userManager.FindByEmailAsync(model.Email) != null)
             {
-                ModelState.AddModelError("Email", "Пользователь с такой почтой уже существует");
+                ModelState.AddModelError(nameof(model.Email), "Пользователь с такой почтой уже существует");
                 return View(model);
             }
 
@@ -60,13 +59,12 @@ namespace AttestationProject.Controllers
             if (!result.Succeeded)
             {
                 foreach (var e in result.Errors)
-                    ModelState.AddModelError("", e.Description);
+                    ModelState.AddModelError(string.Empty, e.Description);
                 return View(model);
             }
 
             await _userManager.AddToRoleAsync(user, "User");
             await _signInManager.SignInAsync(user, isPersistent: false);
-
             return RedirectToLocal(returnUrl);
         }
 
@@ -79,7 +77,7 @@ namespace AttestationProject.Controllers
             return View();
         }
 
-        [HttpPost, AllowAnonymous]
+        [HttpPost, AllowAnonymous, ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginViewModel model, string returnUrl = null)
         {
             ViewData["ReturnUrl"] = returnUrl;
@@ -89,30 +87,29 @@ namespace AttestationProject.Controllers
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user != null && !await _userManager.IsEmailConfirmedAsync(user))
             {
-                ModelState.AddModelError("", "Подтвердите почту перед входом");
+                ModelState.AddModelError(string.Empty, "Пожалуйста, подтвердите электронную почту перед входом.");
                 return View(model);
             }
 
-            var res = await _signInManager.PasswordSignInAsync(
+            var result = await _signInManager.PasswordSignInAsync(
                 model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
 
-            if (res.Succeeded)
+            if (result.Succeeded)
                 return RedirectToLocal(returnUrl);
 
-            if (res.IsLockedOut)
-                ModelState.AddModelError("", "Учетная запись заблокирована");
-            else if (res.RequiresTwoFactor)
-                ModelState.AddModelError("", "Требуется двухфакторная аутентификация");
+            if (result.IsLockedOut)
+                ModelState.AddModelError(string.Empty, "Учетная запись заблокирована.");
+            else if (result.RequiresTwoFactor)
+                ModelState.AddModelError(string.Empty, "Требуется двухфакторная аутентификация.");
             else
-                ModelState.AddModelError("", "Неверный логин или пароль");
+                ModelState.AddModelError(string.Empty, "Неверный логин или пароль.");
 
             return View(model);
         }
 
         /* --------------- ВЫХОД --------------- */
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPost, Authorize, ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
             await _signInManager.SignOutAsync();
@@ -121,8 +118,7 @@ namespace AttestationProject.Controllers
 
         /* -------------- ПРОФИЛЬ -------------- */
 
-        [Authorize]
-        [HttpGet]
+        [HttpGet, Authorize]
         public async Task<IActionResult> Profile()
         {
             var user = await _userManager.GetUserAsync(User);
@@ -137,9 +133,8 @@ namespace AttestationProject.Controllers
             });
         }
 
-        [Authorize]
-        [HttpPost]
-        public async Task<IActionResult> Profile(ProfileViewModel model, IFormFile profileImage)
+        [HttpPost, Authorize, ValidateAntiForgeryToken]
+        public async Task<IActionResult> Profile(ProfileViewModel model)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user == null) return NotFound();
@@ -154,23 +149,27 @@ namespace AttestationProject.Controllers
             user.Address = model.Address;
             user.PhoneNumber = model.PhoneNumber;
 
-            if (profileImage != null && profileImage.Length > 0)
+            // Работаем с файлом из модели
+            if (model.ProfileImage != null && model.ProfileImage.Length > 0)
             {
-                var fileName = Guid.NewGuid() + Path.GetExtension(profileImage.FileName);
-                var path = Path.Combine(Directory.GetCurrentDirectory(),
-                                            "wwwroot/images/profiles", fileName);
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                await using var stream = new FileStream(path, FileMode.Create);
-                await profileImage.CopyToAsync(stream);
-                user.ProfileImage = "/images/profiles/" + fileName;
+                var uploads = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images/profiles");
+                Directory.CreateDirectory(uploads);
+
+                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(model.ProfileImage.FileName)}";
+                var filePath = Path.Combine(uploads, fileName);
+
+                await using var stream = new FileStream(filePath, FileMode.Create);
+                await model.ProfileImage.CopyToAsync(stream);
+
+                user.ProfileImage = $"/images/profiles/{fileName}";
             }
 
-            var res = await _userManager.UpdateAsync(user);
-            if (res.Succeeded)
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (updateResult.Succeeded)
                 return RedirectToAction("Index", "Home");
 
-            foreach (var e in res.Errors)
-                ModelState.AddModelError("", e.Description);
+            foreach (var e in updateResult.Errors)
+                ModelState.AddModelError(string.Empty, e.Description);
 
             model.ExistingImagePath = user.ProfileImage;
             return View(model);
@@ -178,7 +177,7 @@ namespace AttestationProject.Controllers
 
         /* ---------- ACCESS DENIED ---------- */
 
-        [HttpGet]
+        [HttpGet, AllowAnonymous]
         public IActionResult AccessDenied() => View("AccessDenied");
 
         #region Helpers

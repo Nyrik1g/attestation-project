@@ -1,0 +1,30 @@
+﻿@model AttestationProject.Models.ViewModels.ProfileViewModel
+@{
+    ViewData["Title"] = "Профиль";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<form asp-action="Profile" method="post" enctype="multipart/form-data" asp-antiforgery="true">
+    <div class="mb-3">
+        <label asp-for="FullName" class="form-label"></label>
+        <input asp-for="FullName" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="Address" class="form-label"></label>
+        <input asp-for="Address" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="PhoneNumber" class="form-label"></label>
+        <input asp-for="PhoneNumber" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Аватар</label><br />
+        @if (Model.ExistingImagePath != null)
+        {
+            <img src="@Model.ExistingImagePath" alt="Avatar" width="100" class="mb-2" />
+        }
+        <input type="file" name="profileImage" class="form-control" />
+    </div>
+    <button type="submit" class="btn btn-primary">Сохранить</button>
+</form>

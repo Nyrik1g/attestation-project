@@ -1,25 +1,20 @@
-﻿// ✅ Обновлённый RegisterViewModel.cs
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace AttestationProject.Models.ViewModels
 {
     public class RegisterViewModel
     {
-        [Required]
-        [EmailAddress]
-        [Display(Name = "Почта")]
-        public string Email { get; set; } = "";
+        [Required, EmailAddress]
+        [Display(Name = "Эл. почта")]
+        public string Email { get; set; } = null!;
 
-        [Required]
-        [StringLength(16, MinimumLength = 8, ErrorMessage = "Пароль должен содержать от 8 до 16 символов")]
-        [RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,16}$", ErrorMessage = "Пароль должен содержать буквы и цифры")]
-        [DataType(DataType.Password)]
+        [Required, DataType(DataType.Password)]
         [Display(Name = "Пароль")]
-        public string Password { get; set; } = "";
+        public string Password { get; set; } = null!;
 
-        [Compare("Password", ErrorMessage = "Пароли не совпадают")]
-        [DataType(DataType.Password)]
-        [Display(Name = "Подтверждение пароля")]
-        public string ConfirmPassword { get; set; } = "";
+        [Required, DataType(DataType.Password)]
+        [Compare(nameof(Password), ErrorMessage = "Пароли не совпадают")]
+        [Display(Name = "Повторите пароль")]
+        public string ConfirmPassword { get; set; } = null!;
     }
 }
