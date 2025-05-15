@@ -1,9 +1,11 @@
 ﻿using MailKit.Net.Smtp;
 using MimeKit;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Threading.Tasks;
 
-namespace AttestationProject.Services                 // ← важный namespace
+namespace AttestationProject.Services
 {
     public interface IEmailSender
     {
@@ -13,26 +15,64 @@ namespace AttestationProject.Services                 // ← важный namesp
     public class EmailSender : IEmailSender
     {
         private readonly IConfiguration _config;
-        public EmailSender(IConfiguration config) => _config = config;
+        private readonly ILogger<EmailSender> _logger;
+
+        public EmailSender(IConfiguration config, ILogger<EmailSender> logger)
+        {
+            _config = config;
+            _logger = logger;
+        }
 
         public async Task SendAsync(string to, string subject, string htmlBody)
         {
-            var msg = new MimeMessage();
-            msg.From.Add(MailboxAddress.Parse(_config["Smtp:From"]!));
-            msg.To.Add(MailboxAddress.Parse(to));
-            msg.Subject = subject;
-            msg.Body = new TextPart("html") { Text = htmlBody };
+            // Если не настроен Smtp:Host — просто логируем и выходим
+            var host = _config["Smtp:Host"];
+            if (string.IsNullOrWhiteSpace(host))
+            {
+                _logger.LogWarning("SMTP disabled, skipping sending email to {Email}", to);
+                return;
+            }
 
-            using var smtp = new MailKit.Net.Smtp.SmtpClient();
-            await smtp.ConnectAsync(
-                _config["Smtp:Host"],
-                int.Parse(_config["Smtp:Port"]!),
-                true);
-            await smtp.AuthenticateAsync(
-                _config["Smtp:User"],
-                _config["Smtp:Pass"]);
-            await smtp.SendAsync(msg);
-            await smtp.DisconnectAsync(true);
+            // Читаем остальные параметры
+            var portValue = _config["Smtp:Port"];
+            if (!int.TryParse(portValue, out var port))
+            {
+                _logger.LogError("Invalid Smtp:Port value '{Port}'", portValue);
+                return;
+            }
+
+            var from = _config["Smtp:From"];
+            var user = _config["Smtp:User"];
+            var pass = _config["Smtp:Pass"];
+            if (string.IsNullOrWhiteSpace(from) ||
+                string.IsNullOrWhiteSpace(user) ||
+                string.IsNullOrWhiteSpace(pass))
+            {
+                _logger.LogError("SMTP credentials incomplete (From/User/Pass)");
+                return;
+            }
+
+            try
+            {
+                var msg = new MimeMessage();
+                msg.From.Add(MailboxAddress.Parse(from));
+                msg.To.Add(MailboxAddress.Parse(to));
+                msg.Subject = subject;
+                msg.Body = new TextPart("html") { Text = htmlBody };
+
+                using var smtp = new SmtpClient();
+                await smtp.ConnectAsync(host, port, useSsl: true);
+                await smtp.AuthenticateAsync(user, pass);
+                await smtp.SendAsync(msg);
+                await smtp.DisconnectAsync(quit: true);
+
+                _logger.LogInformation("Email sent to {Email} via SMTP {Host}:{Port}", to, host, port);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send email to {Email}", to);
+                // не перебрасываем дальше – иначе любой сбой SMTP даст 500
+            }
         }
     }
 }
