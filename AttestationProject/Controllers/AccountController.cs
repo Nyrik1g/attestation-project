@@ -34,12 +34,18 @@ namespace AttestationProject.Controllers
         /* ------------ РЕГИСТРАЦИЯ ------------ */
 
         [HttpGet, AllowAnonymous]
-        public IActionResult Register() => View();
+        public IActionResult Register(string returnUrl = null)
+        {
+            ViewData["ReturnUrl"] = returnUrl;
+            return View();
+        }
 
         [HttpPost, AllowAnonymous]
-        public async Task<IActionResult> Register(RegisterViewModel model)
+        public async Task<IActionResult> Register(RegisterViewModel model, string returnUrl = null)
         {
-            if (!ModelState.IsValid) return View(model);
+            ViewData["ReturnUrl"] = returnUrl;
+            if (!ModelState.IsValid)
+                return View(model);
 
             if (await _userManager.FindByEmailAsync(model.Email) != null)
             {
@@ -47,57 +53,44 @@ namespace AttestationProject.Controllers
                 return View(model);
             }
 
-            var user = new ApplicationUser { UserName = model.Email, Email = model.Email };
-            var result = await _userManager.CreateAsync(user, model.Password);
+            var user = new ApplicationUser
+            {
+                UserName = model.Email,
+                Email = model.Email,
+                EmailConfirmed = true    // сразу помечаем подтверждённым
+            };
 
+            var result = await _userManager.CreateAsync(user, model.Password);
             if (!result.Succeeded)
             {
-                foreach (var e in result.Errors) ModelState.AddModelError("", e.Description);
+                foreach (var e in result.Errors)
+                    ModelState.AddModelError("", e.Description);
                 return View(model);
             }
 
             await _userManager.AddToRoleAsync(user, "User");
+            await _signInManager.SignInAsync(user, isPersistent: false);
 
-            // ───── письмо подтверждения ─────
-            try
-            {
-                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                var link = Url.Action("ConfirmEmail", "Account",
-                            new { userId = user.Id, token }, Request.Scheme)!;
-
-                await _email.SendAsync(
-                    user.Email,
-                    "Подтверждение регистрации",
-                    $"<p>Нажмите <a href='{link}'>ссылку</a> для подтверждения e-mail.</p>");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Send confirmation mail failed – continue workflow");
-            }
-
-            return View("CheckEmail");
-        }
-
-        [AllowAnonymous]
-        public async Task<IActionResult> ConfirmEmail(string userId, string token)
-        {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null) return NotFound();
-
-            var res = await _userManager.ConfirmEmailAsync(user, token);
-            return res.Succeeded ? View("ConfirmSuccess") : View("ConfirmError");
+            return RedirectToLocal(returnUrl);
         }
 
         /* --------------- ВХОД --------------- */
 
         [HttpGet, AllowAnonymous]
-        public IActionResult Login() => View();
+        public IActionResult Login(string returnUrl = null)
+        {
+            ViewData["ReturnUrl"] = returnUrl;
+            return View();
+        }
 
         [HttpPost, AllowAnonymous]
-        public async Task<IActionResult> Login(LoginViewModel model)
+        public async Task<IActionResult> Login(LoginViewModel model, string returnUrl = null)
         {
-            if (!ModelState.IsValid) return View(model);
+            ViewData["ReturnUrl"] = returnUrl;
+            if (!ModelState.IsValid)
+                return View(model);
 
+            // на всякий случай проверяем подтверждение, но у нас отключено RequireConfirmedEmail
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user != null && !await _userManager.IsEmailConfirmedAsync(user))
             {
@@ -106,16 +99,25 @@ namespace AttestationProject.Controllers
             }
 
             var res = await _signInManager.PasswordSignInAsync(
-                model.Email, model.Password, model.RememberMe, false);
+                model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
 
-            if (res.Succeeded) return RedirectToAction("Index", "Home");
+            if (res.Succeeded)
+                return RedirectToLocal(returnUrl);
 
-            ModelState.AddModelError("", "Неверный логин или пароль");
+            if (res.IsLockedOut)
+                ModelState.AddModelError("", "Учетная запись заблокирована");
+            else if (res.RequiresTwoFactor)
+                ModelState.AddModelError("", "Требуется двухфакторная аутентификация");
+            else
+                ModelState.AddModelError("", "Неверный логин или пароль");
+
             return View(model);
         }
 
         /* --------------- ВЫХОД --------------- */
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
             await _signInManager.SignOutAsync();
@@ -146,7 +148,7 @@ namespace AttestationProject.Controllers
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Send reset-password mail failed – continue workflow");
+                    _logger.LogError(ex, "Send reset-password mail failed");
                 }
             }
             return View("ForgotPasswordConfirmation");
@@ -157,7 +159,8 @@ namespace AttestationProject.Controllers
         [HttpGet, AllowAnonymous]
         public IActionResult ResetPassword(string userId, string token)
         {
-            if (userId == null || token == null) return BadRequest();
+            if (userId == null || token == null)
+                return BadRequest();
             return View(new ResetPasswordViewModel { UserId = userId, Token = token });
         }
 
@@ -167,12 +170,15 @@ namespace AttestationProject.Controllers
             if (!ModelState.IsValid) return View(model);
 
             var user = await _userManager.FindByIdAsync(model.UserId);
-            if (user == null) return View("ResetPasswordSuccess");
+            if (user == null)
+                return View("ResetPasswordSuccess");
 
             var res = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
-            if (res.Succeeded) return View("ResetPasswordSuccess");
+            if (res.Succeeded)
+                return View("ResetPasswordSuccess");
 
-            foreach (var e in res.Errors) ModelState.AddModelError("", e.Description);
+            foreach (var e in res.Errors)
+                ModelState.AddModelError("", e.Description);
             return View(model);
         }
 
@@ -216,19 +222,19 @@ namespace AttestationProject.Controllers
                 var fileName = Guid.NewGuid() + Path.GetExtension(profileImage.FileName);
                 var path = Path.Combine(Directory.GetCurrentDirectory(),
                                             "wwwroot/images/profiles", fileName);
-
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-
                 await using var stream = new FileStream(path, FileMode.Create);
                 await profileImage.CopyToAsync(stream);
-
                 user.ProfileImage = "/images/profiles/" + fileName;
             }
 
             var res = await _userManager.UpdateAsync(user);
-            if (res.Succeeded) return RedirectToAction("Index", "Home");
+            if (res.Succeeded)
+                return RedirectToAction("Index", "Home");
 
-            foreach (var e in res.Errors) ModelState.AddModelError("", e.Description);
+            foreach (var e in res.Errors)
+                ModelState.AddModelError("", e.Description);
+
             model.ExistingImagePath = user.ProfileImage;
             return View(model);
         }
@@ -236,6 +242,15 @@ namespace AttestationProject.Controllers
         /* ---------- ACCESS DENIED ---------- */
 
         [HttpGet]
-        public IActionResult AccessDenied() => Content("Доступ запрещён");
+        public IActionResult AccessDenied() => View("AccessDenied");
+
+        #region Helpers
+        private IActionResult RedirectToLocal(string returnUrl)
+        {
+            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                return Redirect(returnUrl);
+            return RedirectToAction("Index", "Home");
+        }
+        #endregion
     }
 }
