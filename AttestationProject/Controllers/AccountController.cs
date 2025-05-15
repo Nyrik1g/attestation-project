@@ -1,11 +1,14 @@
-﻿using AttestationProject.Models;
-using AttestationProject.Models.ViewModels;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using AttestationProject.Services;
+﻿using System;
 using System.IO;
 using System.Threading.Tasks;
+using AttestationProject.Models;
+using AttestationProject.Models.ViewModels;
+using AttestationProject.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace AttestationProject.Controllers
 {
@@ -13,19 +16,22 @@ namespace AttestationProject.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly IEmailSender _email;      // сервис отправки писем
+        private readonly IEmailSender _email;
+        private readonly ILogger<AccountController> _logger;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
-            IEmailSender emailSender)
+            IEmailSender emailSender,
+            ILogger<AccountController> logger)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _email = emailSender;
+            _logger = logger;
         }
 
-        /* ------------------ РЕГИСТРАЦИЯ ------------------ */
+        /* ------------ РЕГИСТРАЦИЯ ------------ */
 
         [HttpGet, AllowAnonymous]
         public IActionResult Register() => View();
@@ -44,29 +50,33 @@ namespace AttestationProject.Controllers
             var user = new ApplicationUser { UserName = model.Email, Email = model.Email };
             var result = await _userManager.CreateAsync(user, model.Password);
 
-            if (result.Succeeded)
+            if (!result.Succeeded)
             {
-                /* выдаём базовую роль */
-                await _userManager.AddToRoleAsync(user, "User");
+                foreach (var e in result.Errors) ModelState.AddModelError("", e.Description);
+                return View(model);
+            }
 
-                /* письмо для подтверждения */
+            await _userManager.AddToRoleAsync(user, "User");
+
+            // ───── письмо подтверждения ─────
+            try
+            {
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
                 var link = Url.Action("ConfirmEmail", "Account",
-                              new { userId = user.Id, token }, Request.Scheme)!;
+                            new { userId = user.Id, token }, Request.Scheme)!;
 
                 await _email.SendAsync(
                     user.Email,
                     "Подтверждение регистрации",
                     $"<p>Нажмите <a href='{link}'>ссылку</a> для подтверждения e-mail.</p>");
-
-                return View("CheckEmail");          // Views/Account/CheckEmail.cshtml
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Send confirmation mail failed – continue workflow");
             }
 
-            foreach (var e in result.Errors) ModelState.AddModelError("", e.Description);
-            return View(model);
+            return View("CheckEmail");
         }
-
-        /* ---------- подтверждение e-mail ---------- */
 
         [AllowAnonymous]
         public async Task<IActionResult> ConfirmEmail(string userId, string token)
@@ -78,7 +88,7 @@ namespace AttestationProject.Controllers
             return res.Succeeded ? View("ConfirmSuccess") : View("ConfirmError");
         }
 
-        /* ------------------ ВХОД ------------------ */
+        /* --------------- ВХОД --------------- */
 
         [HttpGet, AllowAnonymous]
         public IActionResult Login() => View();
@@ -91,7 +101,7 @@ namespace AttestationProject.Controllers
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user != null && !await _userManager.IsEmailConfirmedAsync(user))
             {
-                ModelState.AddModelError("", "Подтвердите почту перед входом.");
+                ModelState.AddModelError("", "Подтвердите почту перед входом");
                 return View(model);
             }
 
@@ -104,7 +114,7 @@ namespace AttestationProject.Controllers
             return View(model);
         }
 
-        /* ------------------ ВЫХОД ------------------ */
+        /* --------------- ВЫХОД --------------- */
 
         public async Task<IActionResult> Logout()
         {
@@ -112,7 +122,7 @@ namespace AttestationProject.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        /* ---------------- ЗАБЫЛ ПАРОЛЬ -------------- */
+        /* ---------- ЗАБЫЛ ПАРОЛЬ ---------- */
 
         [HttpGet, AllowAnonymous]
         public IActionResult ForgotPassword() => View();
@@ -125,17 +135,24 @@ namespace AttestationProject.Controllers
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user != null && await _userManager.IsEmailConfirmedAsync(user))
             {
-                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-                var link = Url.Action("ResetPassword", "Account",
-                             new { userId = user.Id, token }, Request.Scheme)!;
+                try
+                {
+                    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                    var link = Url.Action("ResetPassword", "Account",
+                                 new { userId = user.Id, token }, Request.Scheme)!;
 
-                await _email.SendAsync(user.Email, "Сброс пароля",
-                    $"<p>Для сброса пароля перейдите по <a href='{link}'>ссылке</a>.</p>");
+                    await _email.SendAsync(user.Email, "Сброс пароля",
+                        $"<p>Для сброса пароля перейдите по <a href='{link}'>ссылке</a>.</p>");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Send reset-password mail failed – continue workflow");
+                }
             }
             return View("ForgotPasswordConfirmation");
         }
 
-        /* ---------------- СБРОС ПАРОЛЯ -------------- */
+        /* ---------- СБРОС ПАРОЛЯ ---------- */
 
         [HttpGet, AllowAnonymous]
         public IActionResult ResetPassword(string userId, string token)
@@ -159,7 +176,7 @@ namespace AttestationProject.Controllers
             return View(model);
         }
 
-        /* ------------------ ПРОФИЛЬ ------------------ */
+        /* -------------- ПРОФИЛЬ -------------- */
 
         [Authorize]
         [HttpGet]
@@ -197,9 +214,8 @@ namespace AttestationProject.Controllers
             if (profileImage != null && profileImage.Length > 0)
             {
                 var fileName = Guid.NewGuid() + Path.GetExtension(profileImage.FileName);
-                var path = Path.Combine(
-                                  Directory.GetCurrentDirectory(),
-                                  "wwwroot/images/profiles", fileName);
+                var path = Path.Combine(Directory.GetCurrentDirectory(),
+                                            "wwwroot/images/profiles", fileName);
 
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
@@ -209,15 +225,15 @@ namespace AttestationProject.Controllers
                 user.ProfileImage = "/images/profiles/" + fileName;
             }
 
-            var result = await _userManager.UpdateAsync(user);
-            if (result.Succeeded) return RedirectToAction("Index", "Home");
+            var res = await _userManager.UpdateAsync(user);
+            if (res.Succeeded) return RedirectToAction("Index", "Home");
 
-            foreach (var e in result.Errors) ModelState.AddModelError("", e.Description);
+            foreach (var e in res.Errors) ModelState.AddModelError("", e.Description);
             model.ExistingImagePath = user.ProfileImage;
             return View(model);
         }
 
-        /* ------------- ACCESS DENIED -------------- */
+        /* ---------- ACCESS DENIED ---------- */
 
         [HttpGet]
         public IActionResult AccessDenied() => Content("Доступ запрещён");
