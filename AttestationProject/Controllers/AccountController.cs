@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading.Tasks;
 using AttestationProject.Models;
 using AttestationProject.Models.ViewModels;
-using AttestationProject.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -16,18 +15,15 @@ namespace AttestationProject.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly IEmailSender _email;
         private readonly ILogger<AccountController> _logger;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
-            IEmailSender emailSender,
             ILogger<AccountController> logger)
         {
             _userManager = userManager;
             _signInManager = signInManager;
-            _email = emailSender;
             _logger = logger;
         }
 
@@ -57,7 +53,7 @@ namespace AttestationProject.Controllers
             {
                 UserName = model.Email,
                 Email = model.Email,
-                EmailConfirmed = true    // сразу помечаем подтверждённым
+                EmailConfirmed = true
             };
 
             var result = await _userManager.CreateAsync(user, model.Password);
@@ -90,7 +86,6 @@ namespace AttestationProject.Controllers
             if (!ModelState.IsValid)
                 return View(model);
 
-            // на всякий случай проверяем подтверждение, но у нас отключено RequireConfirmedEmail
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user != null && !await _userManager.IsEmailConfirmedAsync(user))
             {
@@ -122,64 +117,6 @@ namespace AttestationProject.Controllers
         {
             await _signInManager.SignOutAsync();
             return RedirectToAction("Index", "Home");
-        }
-
-        /* ---------- ЗАБЫЛ ПАРОЛЬ ---------- */
-
-        [HttpGet, AllowAnonymous]
-        public IActionResult ForgotPassword() => View();
-
-        [HttpPost, AllowAnonymous]
-        public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
-        {
-            if (!ModelState.IsValid) return View(model);
-
-            var user = await _userManager.FindByEmailAsync(model.Email);
-            if (user != null && await _userManager.IsEmailConfirmedAsync(user))
-            {
-                try
-                {
-                    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-                    var link = Url.Action("ResetPassword", "Account",
-                                 new { userId = user.Id, token }, Request.Scheme)!;
-
-                    await _email.SendAsync(user.Email, "Сброс пароля",
-                        $"<p>Для сброса пароля перейдите по <a href='{link}'>ссылке</a>.</p>");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Send reset-password mail failed");
-                }
-            }
-            return View("ForgotPasswordConfirmation");
-        }
-
-        /* ---------- СБРОС ПАРОЛЯ ---------- */
-
-        [HttpGet, AllowAnonymous]
-        public IActionResult ResetPassword(string userId, string token)
-        {
-            if (userId == null || token == null)
-                return BadRequest();
-            return View(new ResetPasswordViewModel { UserId = userId, Token = token });
-        }
-
-        [HttpPost, AllowAnonymous]
-        public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
-        {
-            if (!ModelState.IsValid) return View(model);
-
-            var user = await _userManager.FindByIdAsync(model.UserId);
-            if (user == null)
-                return View("ResetPasswordSuccess");
-
-            var res = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
-            if (res.Succeeded)
-                return View("ResetPasswordSuccess");
-
-            foreach (var e in res.Errors)
-                ModelState.AddModelError("", e.Description);
-            return View(model);
         }
 
         /* -------------- ПРОФИЛЬ -------------- */

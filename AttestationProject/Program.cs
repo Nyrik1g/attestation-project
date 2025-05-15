@@ -1,6 +1,5 @@
 ﻿using AttestationProject.Data;
 using AttestationProject.Models;
-using AttestationProject.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,28 +17,21 @@ builder.Configuration
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// — Identity
+// — Identity (без EmailSender)
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
-    // Отключаем требование подтверждённого e-mail
     options.SignIn.RequireConfirmedEmail = false;
-
-    // Настройка паролей
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequiredLength = 8;
     options.Password.RequireDigit = true;
     options.Password.RequireUppercase = false;
     options.Password.RequireLowercase = false;
 })
-    .AddEntityFrameworkStores<AppDbContext>()
-    .AddDefaultTokenProviders();
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders();
 
-// — MVC + Razor Pages (для страницы подтверждения и сброса пароля Identity UI)
+// — MVC
 builder.Services.AddControllersWithViews();
-builder.Services.AddRazorPages();
-
-// — Наш защищённый EmailSender (MailKit, но пропускает, если нет Smtp:Host)
-builder.Services.AddTransient<IEmailSender, EmailSender>();
 
 // — Настройка cookie
 builder.Services.ConfigureApplicationCookie(opt =>
@@ -67,11 +59,10 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// — Маршруты для MVC и Identity UI
+// — Маршрут по умолчанию
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
-app.MapRazorPages();  // нужно, чтобы работали страницы Identity
 
 // — Seed ролей
 using (var scope = app.Services.CreateScope())
@@ -82,7 +73,7 @@ using (var scope = app.Services.CreateScope())
             await roleMgr.CreateAsync(new IdentityRole(name));
 }
 
-// — Seed первого админа (замените на ваш e-mail и безопасный пароль)
+// — Seed первого админа
 using (var scope = app.Services.CreateScope())
 {
     var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -97,10 +88,8 @@ using (var scope = app.Services.CreateScope())
             Email = adminMail,
             EmailConfirmed = true
         };
-        // Установите здесь ваш сложный пароль
         await userMgr.CreateAsync(admin, "VeryStrongP@ssw0rd!");
     }
-
     if (!await userMgr.IsInRoleAsync(admin, "Admin"))
         await userMgr.AddToRoleAsync(admin, "Admin");
 }
