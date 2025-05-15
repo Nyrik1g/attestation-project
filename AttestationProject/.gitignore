@@ -6,7 +6,7 @@
 *.sln.docstates
 .vs/
 
-## Build results
+## Build results	
 bin/
 obj/
 publish/
